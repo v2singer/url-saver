@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>URL Tag Saver</h2>
+      <button id="openOptions" class="settings-btn" title="Open Settings">⚙️</button>
+    </div>
+    <div class="url-display">
+      <p>Title: <span id="current-title"></span></p>
+      <p>URL: <span id="current-url"></span></p>
+    </div>
+    <div class="suggestions-container">
+      <h3>Suggested Tags</h3>
+      <div id="suggested-tags" class="suggested-tags"></div>
+    </div>
+    <div class="input-group">
+      <input type="text" id="tags" placeholder="Enter tags (comma separated)">
+    </div>
+    <div class="input-group">
+      <textarea id="notes" placeholder="Add notes (optional)"></textarea>
+    </div>
+    <div class="button-group">
+      <button id="save">Save URL</button>
+      <button id="show-list">Show Recent URLs</button>
+    </div>
+    <div id="status"></div>
+    
+    <!-- 添加URL列表显示区域 -->
+    <div id="url-list" class="url-list" style="display: none;">
+      <h3>Recent URLs</h3>
+      <div id="url-list-content"></div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html> 
