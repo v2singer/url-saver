@@ -174,4 +174,4 @@ if __name__ == '__main__':
         raise
 
     # 启动服务器
-    app.run(debug=True, port=8080, host='localhost') 
+    app.run(debug=True, port=8080, host='0.0.0.0') 
