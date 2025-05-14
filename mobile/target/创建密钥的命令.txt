@@ -1,0 +1,3 @@
+keytool -v -genkey -keystore mygame.keystore -alias mygame -keyalg RSA -validity 10000 -dname "CN=John Doe, OU=Development, O=MyGame Inc, L=Beijing, ST=Beijing, C=CN"
+
+123456
