@@ -1,5 +1,6 @@
 urls.db
 server.log
 
+server/__pycache__
 *.pyc
 target
