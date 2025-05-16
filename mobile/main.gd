@@ -3,6 +3,8 @@ extends Control
 const CONFIG_FILE = "user://server_config.cfg"
 const API_HISTORY = "/extension/urls"
 const API_SAVE = "/extension/urls"
+const MAX_RETRIES = 1
+const RETRY_DELAY = 1.0  # seconds
 
 var http_request: HTTPRequest
 var history_request: HTTPRequest
@@ -11,6 +13,9 @@ var config_panel_scene = preload("res://config_panel.tscn")
 var config: ConfigFile
 var current_server_index = 0
 var server_urls = []
+var is_requesting = false
+var retry_count = 0
+var retry_timer: Timer
 
 func _ready():
 	# 等待一帧以确保所有节点都已准备好
@@ -23,21 +28,11 @@ func _ready():
 	http_request.request_completed.connect(_on_request_completed)
 	history_request.request_completed.connect(_on_history_request_completed)
 	
-	# 确保节点存在后再连接信号
-	if has_node("VBoxContainer/AddButton"):
-		$VBoxContainer/AddButton.pressed.connect(_on_add_pressed)
-		print('add connectted')
-	else:
-		print('add pressed not connectted')
-	
-	if has_node("VBoxContainer/HBoxContainer/ConfigButton"):
-		$VBoxContainer/HBoxContainer/ConfigButton.pressed.connect(_on_config_pressed)
-	
-	if has_node("AddURLPanel/VBoxContainer/SubmitButton"):
-		$AddURLPanel/VBoxContainer/SubmitButton.pressed.connect(_on_submit_pressed)
-	
-	if has_node("AddURLPanel/VBoxContainer/HBoxContainer/CloseButton"):
-		$AddURLPanel/VBoxContainer/HBoxContainer/CloseButton.pressed.connect(_on_close_pressed)
+	# 创建重试定时器
+	retry_timer = Timer.new()
+	retry_timer.one_shot = true
+	retry_timer.timeout.connect(_on_retry_timeout)
+	add_child(retry_timer)
 	
 	# Load server configuration
 	load_server_config()
@@ -49,7 +44,7 @@ func load_server_config():
 	var err = config.load(CONFIG_FILE)
 	if err != OK:
 		# Create default config if it doesn't exist
-		config.set_value("servers", "default", "http://localhost:8080")
+		config.set_value("servers", "default", "http://192.168.1.11:8080")
 		config.save(CONFIG_FILE)
 	
 	# Load all server URLs
@@ -61,29 +56,66 @@ func load_server_config():
 
 func get_current_server_url() -> String:
 	if server_urls.size() == 0:
-		return "http://localhost:8080"
-	return server_urls[current_server_index]
+		return "http://192.168.1.11:8080"
+	return "http://192.168.1.11:8080"
 
 func try_next_server():
 	current_server_index = (current_server_index + 1) % server_urls.size()
+	retry_count = 0
 	load_history()
 
+func _on_retry_timeout():
+	if retry_count < MAX_RETRIES:
+		retry_count += 1
+		print("Retrying request, attempt ", retry_count, " of ", MAX_RETRIES)
+		load_history()
+	else:
+		print("Max retries reached, trying next server")
+		try_next_server()
+
 func load_history():
+	if is_requesting:
+		return
+		
+	is_requesting = true
 	var server_url = get_current_server_url() + API_HISTORY
+	
+	# 设置超时
+	var client = HTTPClient.new()
+	client.set_blocking_mode(true)
+	client.set_read_chunk_size(65536)  # 64KB chunks
+	
 	var error = history_request.request(server_url)
 	if error != OK:
 		print("Error requesting history: ", error)
-		try_next_server()
+		is_requesting = false
+		if error in [25, 44]:  # 网络相关错误
+			if retry_count < MAX_RETRIES:
+				retry_timer.start(RETRY_DELAY)
+			else:
+				try_next_server()
+		else:
+			try_next_server()
 
 func _on_history_request_completed(result, response_code, headers, body):
+	is_requesting = false
+	print("History request completed with result: ", result, " response code: ", response_code)
+	
 	if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
 		var json = JSON.parse_string(body.get_string_from_utf8())
 		if json:
 			clear_history_list()
 			for item in json:
 				add_url_item(item.url, item.tags)
+		retry_count = 0  # 重置重试计数
 	else:
-		try_next_server()
+		if result in [HTTPRequest.RESULT_CONNECTION_ERROR, HTTPRequest.RESULT_CHUNKED_BODY_SIZE_MISMATCH]:
+			if retry_count < MAX_RETRIES:
+				retry_timer.start(RETRY_DELAY)
+			else:
+				try_next_server()
+		else:
+			try_next_server()
 
 func clear_history_list():
 	if has_node("VBoxContainer/ScrollContainer/HistoryList"):
@@ -110,6 +142,9 @@ func _on_close_pressed():
 		$AddURLPanel.visible = false
 
 func _on_submit_pressed():
+	if is_requesting:
+		return
+		
 	if not has_node("AddURLPanel/VBoxContainer/URLLineEdit") or not has_node("AddURLPanel/VBoxContainer/TagLineEdit"):
 		return
 		
@@ -127,6 +162,7 @@ func _on_submit_pressed():
 		"tags": tags.split(",")
 	})
 	
+	is_requesting = true
 	var server_url = get_current_server_url() + API_SAVE
 	if has_node("AddURLPanel/VBoxContainer/StatusLabel"):
 		$AddURLPanel/VBoxContainer/StatusLabel.text = "Sending..."
@@ -134,9 +170,17 @@ func _on_submit_pressed():
 	var error = http_request.request(server_url, headers, HTTPClient.METHOD_POST, body)
 	if error != OK and has_node("AddURLPanel/VBoxContainer/StatusLabel"):
 		$AddURLPanel/VBoxContainer/StatusLabel.text = "Error: " + str(error)
-		try_next_server()
+		is_requesting = false
+		if error in [25, 44]:  # 网络相关错误
+			if retry_count < MAX_RETRIES:
+				retry_timer.start(RETRY_DELAY)
+			else:
+				try_next_server()
+		else:
+			try_next_server()
 
 func _on_request_completed(result, response_code, headers, body):
+	is_requesting = false
 	if not has_node("AddURLPanel/VBoxContainer/StatusLabel"):
 		return
 		
@@ -149,10 +193,23 @@ func _on_request_completed(result, response_code, headers, body):
 				$AddURLPanel/VBoxContainer/TagLineEdit.text = ""
 			if has_node("AddURLPanel"):
 				$AddURLPanel.visible = false
+			retry_count = 0  # 重置重试计数
 			load_history()  # 重新加载历史记录
 		else:
 			$AddURLPanel/VBoxContainer/StatusLabel.text = "Error: Server returned " + str(response_code)
-			try_next_server()
+			if result in [HTTPRequest.RESULT_CONNECTION_ERROR, HTTPRequest.RESULT_CHUNKED_BODY_SIZE_MISMATCH]:
+				if retry_count < MAX_RETRIES:
+					retry_timer.start(RETRY_DELAY)
+				else:
+					try_next_server()
+			else:
+				try_next_server()
 	else:
 		$AddURLPanel/VBoxContainer/StatusLabel.text = "Error: Request failed"
-		try_next_server() 
+		if result in [HTTPRequest.RESULT_CONNECTION_ERROR, HTTPRequest.RESULT_CHUNKED_BODY_SIZE_MISMATCH]:
+			if retry_count < MAX_RETRIES:
+				retry_timer.start(RETRY_DELAY)
+			else:
+				try_next_server()
+		else:
+			try_next_server() 
