@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from server.database import get_db, engine
 from server.models import URL, Base
+from server.url_queue import url_queue
+from server.worker import url_worker
 from sqlalchemy.exc import SQLAlchemyError
 import logging
 import traceback
@@ -172,6 +174,14 @@ if __name__ == '__main__':
         error_msg = f"Failed to initialize database: {str(e)}\n{traceback.format_exc()}"
         logger.error(error_msg)
         raise
+
+    # 启动URL队列处理器
+    url_queue.start()
+    logger.info("URL queue processor started")
+
+    # 启动URL处理工作线程
+    url_worker.start()
+    logger.info("URL worker started")
 
     # 启动服务器
     app.run(debug=True, port=8080, host='0.0.0.0') 

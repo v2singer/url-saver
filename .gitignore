@@ -4,3 +4,7 @@ server.log
 server/__pycache__
 *.pyc
 target
+
+# 
+downloads
+processed
