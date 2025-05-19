@@ -109,7 +109,7 @@ func load_server_config():
 
 func get_current_server_url() -> String:
 	if server_urls.size() == 0:
-		return "http://192.168.1.11:8080"
+		return "http://localhost:8080"
 	return server_urls[current_server_index]
 
 func try_next_server():
@@ -169,6 +169,7 @@ func _on_history_request_completed(result, response_code, headers, body):
 				try_next_server()
 		else:
 			try_next_server()
+		retry_count = 0  # 重置重试计数
 
 func clear_history_list():
 	if has_node("VBoxContainer/ScrollContainer/HistoryList"):
@@ -246,6 +247,7 @@ func _on_request_completed(result, response_code, headers, body):
 				$AddURLPanel/VBoxContainer/TagLineEdit.text = ""
 			if has_node("AddURLPanel"):
 				$AddURLPanel.visible = false
+			retry_count = 0  # 重置重试计数
 			retry_count = 0  # 重置重试计数
 			load_history()  # 重新加载历史记录
 		else:

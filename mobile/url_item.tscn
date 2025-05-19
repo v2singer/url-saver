@@ -1,6 +1,18 @@
-[gd_scene load_steps=2 format=3 uid="uid://c8q6v4y2n3m1p"]
+[gd_scene load_steps=3 format=3 uid="uid://c8q6v4y2n3m1p"]
 
 [ext_resource type="Script" uid="uid://c4eejqw8n5da2" path="res://url_item.gd" id="1_2k4m3"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1"]
+bg_color = Color(0.929412, 0.956863, 0.929412, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.2, 0.4, 0.8, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
 
 [node name="URLItem" type="PanelContainer"]
 custom_minimum_size = Vector2(0, 100)
@@ -8,14 +20,19 @@ anchors_preset = 10
 anchor_right = 1.0
 offset_bottom = 100.0
 grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_1")
 script = ExtResource("1_2k4m3")
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
 layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="ColorRect" type="ColorRect" parent="MarginContainer"]
+layout_mode = 2
+color = Color(0.929412, 0.956863, 0.929412, 1)
 
 [node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
 layout_mode = 2

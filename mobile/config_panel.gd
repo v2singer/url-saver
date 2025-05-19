@@ -13,7 +13,7 @@ func load_config():
 	var err = config.load(CONFIG_FILE)
 	if err != OK:
 		# Create default config if it doesn't exist
-		config.set_value("servers", "default", "http://192.168.1.11:8080")
+		config.set_value("servers", "default", "http://localhost:8080")
 		config.save(CONFIG_FILE)
 
 func save_config():
