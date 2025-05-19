@@ -4,6 +4,7 @@ server.log
 server/__pycache__
 *.pyc
 target
+.godot
 
 # 
 downloads
