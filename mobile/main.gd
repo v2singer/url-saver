@@ -38,13 +38,66 @@ func _ready():
 	load_server_config()
 	# 加载历史记录
 	load_history()
+	
+	# 检查是否有传入的URL
+	if OS.has_feature("Android"):
+		_check_android_intent()
+	elif OS.has_feature("iOS"):
+		_check_ios_url()
+
+func _check_android_intent():
+	if OS.has_feature("Android"):
+		var intent_data = Engine.get_singleton("GodotAndroid").get_intent_data()
+		if intent_data:
+			_handle_shared_url(intent_data)
+
+func _check_ios_url():
+	if OS.has_feature("iOS"):
+		# 注册处理URL的回调
+		Engine.get_singleton("GodotIOS").connect("url_received", _on_ios_url_received)
+		# 检查启动URL
+		var launch_url = Engine.get_singleton("GodotIOS").get_launch_url()
+		if launch_url:
+			_handle_shared_url(launch_url)
+
+func _on_ios_url_received(url: String):
+	_handle_shared_url(url)
+
+func _handle_shared_url(url: String):
+	if url.begins_with("http://") or url.begins_with("https://"):
+		# 自动保存URL到服务器
+		_save_url_to_server(url, ["bilibili"])
+
+func _save_url_to_server(url: String, tags: Array):
+	if is_requesting:
+		return
+		
+	var headers = ["Content-Type: application/json"]
+	var body = JSON.stringify({
+		"url": url,
+		"tags": tags
+	})
+	
+	is_requesting = true
+	var server_url = get_current_server_url() + API_SAVE
+	
+	var error = http_request.request(server_url, headers, HTTPClient.METHOD_POST, body)
+	if error != OK:
+		is_requesting = false
+		if error in [25, 44]:  # 网络相关错误
+			if retry_count < MAX_RETRIES:
+				retry_timer.start(RETRY_DELAY)
+			else:
+				try_next_server()
+		else:
+			try_next_server()
 
 func load_server_config():
 	config = ConfigFile.new()
 	var err = config.load(CONFIG_FILE)
 	if err != OK:
 		# Create default config if it doesn't exist
-		config.set_value("servers", "default", "http://192.168.1.11:8080")
+		config.set_value("servers", "default", "http://localhost:8080")
 		config.save(CONFIG_FILE)
 	
 	# Load all server URLs
@@ -57,7 +110,7 @@ func load_server_config():
 func get_current_server_url() -> String:
 	if server_urls.size() == 0:
 		return "http://192.168.1.11:8080"
-	return "http://192.168.1.11:8080"
+	return server_urls[current_server_index]
 
 func try_next_server():
 	current_server_index = (current_server_index + 1) % server_urls.size()

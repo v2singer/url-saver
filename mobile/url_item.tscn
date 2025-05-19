@@ -4,7 +4,6 @@
 
 [node name="URLItem" type="PanelContainer"]
 custom_minimum_size = Vector2(0, 100)
-layout_mode = 3
 anchors_preset = 10
 anchor_right = 1.0
 offset_bottom = 100.0
@@ -21,13 +20,16 @@ theme_override_constants/margin_bottom = 10
 [node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
 layout_mode = 2
 
-[node name="URLLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="URLLabel" type="RichTextLabel" parent="MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
+theme_override_colors/default_color = Color(0.2, 0.4, 0.8, 1)
+theme_override_font_sizes/normal_font_size = 25
+bbcode_enabled = true
 text = "URL"
-theme_override_colors/font_color = Color(0.2, 0.4, 0.8, 1)
-theme_override_font_sizes/font_size = 16
+context_menu_enabled = true
 
 [node name="TagsLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
-text = "Tags"
 theme_override_colors/font_color = Color(0.4, 0.4, 0.4, 1)
+text = "Tags"
