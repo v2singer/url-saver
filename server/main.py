@@ -176,12 +176,12 @@ if __name__ == '__main__':
         raise
 
     # 启动URL队列处理器
-    url_queue.start()
-    logger.info("URL queue processor started")
+    #url_queue.start()
+    #logger.info("URL queue processor started")
 
     # 启动URL处理工作线程
-    url_worker.start()
-    logger.info("URL worker started")
+    #url_worker.start()
+    #logger.info("URL worker started")
 
     # 启动服务器
     app.run(debug=True, port=8080, host='0.0.0.0') 
