@@ -5,6 +5,8 @@ server/__pycache__
 *.pyc
 target
 .godot
+mobile/addons
+mobile/android
 
 # 
 downloads

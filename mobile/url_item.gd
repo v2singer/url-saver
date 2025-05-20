@@ -27,10 +27,10 @@ func _on_url_label_gui_input(event: InputEvent):
 				# 复制URL到剪贴板
 				DisplayServer.clipboard_set(current_url)
 				# 显示复制成功提示
-				var notification = Label.new()
-				notification.text = "URL已复制到剪贴板"
-				notification.position = get_global_mouse_position()
-				add_child(notification)
-				# 1秒后移除提示
-				await get_tree().create_timer(1.0).timeout
-				notification.queue_free() 
+				var copy_notification = Label.new()
+				copy_notification.text = "URL已复制到剪贴板"
+				copy_notification.position = get_global_mouse_position()
+				add_child(copy_notification)
+				# 2秒后移除提示
+				await get_tree().create_timer(2.0).timeout
+				copy_notification.queue_free() 

@@ -18,6 +18,10 @@ var retry_count = 0
 var retry_timer: Timer
 
 func _ready():
+	if OS.get_name() == "Windows":
+		DisplayServer.window_set_size(Vector2i(1280, 720))
+	elif OS.get_name() == "Android":
+		DisplayServer.window_set_size(Vector2i(720, 1280))
 	# 等待一帧以确保所有节点都已准备好
 	await get_tree().process_frame
 	
@@ -49,7 +53,14 @@ func _check_android_intent():
 	if OS.has_feature("Android"):
 		var intent_data = Engine.get_singleton("GodotAndroid").get_intent_data()
 		if intent_data:
-			_handle_shared_url(intent_data)
+			# 处理分享的文字内容
+			if intent_data.has("text"):
+				var shared_text = intent_data["text"]
+				_handle_shared_text(shared_text)
+			# 处理分享的URL
+			elif intent_data.has("url"):
+				var shared_url = intent_data["url"]
+				_handle_shared_url(shared_url)
 
 func _check_ios_url():
 	if OS.has_feature("iOS"):
@@ -63,10 +74,10 @@ func _check_ios_url():
 func _on_ios_url_received(url: String):
 	_handle_shared_url(url)
 
-func _handle_shared_url(url: String):
+func _handle_shared_url(url: String, tags: Array = ["bilibili"]):
 	if url.begins_with("http://") or url.begins_with("https://"):
 		# 自动保存URL到服务器
-		_save_url_to_server(url, ["bilibili"])
+		_save_url_to_server(url, tags)
 
 func _save_url_to_server(url: String, tags: Array):
 	if is_requesting:
@@ -107,7 +118,8 @@ func load_server_config():
 		var url = config.get_value("servers", server)
 		server_urls.append(url)
 
-func get_current_server_url() -> String:
+
+func get_current_server_url():
 	if server_urls.size() == 0:
 		return "http://localhost:8080"
 	return server_urls[current_server_index]
@@ -150,7 +162,7 @@ func load_history():
 		else:
 			try_next_server()
 
-func _on_history_request_completed(result, response_code, headers, body):
+func _on_history_request_completed(result, response_code, _headers, body):
 	is_requesting = false
 	print("History request completed with result: ", result, " response code: ", response_code)
 	
@@ -233,7 +245,7 @@ func _on_submit_pressed():
 		else:
 			try_next_server()
 
-func _on_request_completed(result, response_code, headers, body):
+func _on_request_completed(result, response_code, _headers, _body):
 	is_requesting = false
 	if not has_node("AddURLPanel/VBoxContainer/StatusLabel"):
 		return
@@ -268,3 +280,26 @@ func _on_request_completed(result, response_code, headers, body):
 				try_next_server()
 		else:
 			try_next_server() 
+
+func _handle_shared_text(text: String):
+	# 检查文本是否包含URL
+	var url_regex = RegEx.new()
+	url_regex.compile("https?://\\S+")
+	var result = url_regex.search(text)
+	
+	if result:
+		# 如果文本包含URL，提取并处理URL
+		var url = result.get_string()
+		_handle_shared_url(url)
+	else:
+		# 如果不是URL，可以显示一个对话框让用户确认是否保存为文本
+		var dialog = AcceptDialog.new()
+		dialog.title = "收到分享的文本"
+		dialog.dialog_text = "是否保存以下文本？\n\n" + text
+		dialog.confirmed.connect(func(): _save_text_to_server(text))
+		add_child(dialog)
+		dialog.popup_centered()
+
+func _save_text_to_server(text: String):
+	# 将文本保存到服务器
+	_save_url_to_server(text, ["text"]) 

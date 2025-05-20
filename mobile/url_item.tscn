@@ -44,6 +44,8 @@ theme_override_colors/default_color = Color(0.2, 0.4, 0.8, 1)
 theme_override_font_sizes/normal_font_size = 25
 bbcode_enabled = true
 text = "URL"
+fit_content = true
+autowrap_mode = 1
 context_menu_enabled = true
 
 [node name="TagsLabel" type="Label" parent="MarginContainer/VBoxContainer"]
