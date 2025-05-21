@@ -5,6 +5,7 @@ from server.models import URL, Base
 from server.url_queue import url_queue
 from server.worker import url_worker
 from sqlalchemy.exc import SQLAlchemyError
+from server.config import ENABLE_QUEUE_PROCESSOR, ENABLE_URL_WORKER
 import logging
 import traceback
 import os
@@ -176,12 +177,18 @@ if __name__ == '__main__':
         raise
 
     # 启动URL队列处理器
-    #url_queue.start()
-    #logger.info("URL queue processor started")
+    if ENABLE_QUEUE_PROCESSOR:
+        url_queue.start()
+        logger.info("URL queue processor started")
+    else:
+        logger.info("URL queue processor is disabled")
 
     # 启动URL处理工作线程
-    #url_worker.start()
-    #logger.info("URL worker started")
+    if ENABLE_URL_WORKER:
+        url_worker.start()
+        logger.info("URL worker started")
+    else:
+        logger.info("URL worker is disabled")
 
     # 启动服务器
     app.run(debug=True, port=8080, host='0.0.0.0') 

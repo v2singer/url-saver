@@ -1,56 +1,73 @@
+from server.config import get_enabled_operators, DOMAIN_CONFIGS
+from server.url_queue import url_queue
+import logging
 import threading
 import time
-import logging
-from server.url_queue import url_queue
-from server.rule import url_processor
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
 class URLWorker:
     def __init__(self):
-        self.is_running = False
+        self.running = False
         self.thread = None
-        self.processing_interval = 1  # 处理间隔（秒）
+        self.operators = get_enabled_operators()
+
+    def process_url(self, url_data):
+        try:
+            # Get domain from URL
+            domain = urlparse(url_data['url']).netloc
+            
+            # Get domain configuration
+            if domain not in DOMAIN_CONFIGS:
+                logger.warning(f"No configuration found for domain: {domain}")
+                return url_data
+                
+            config = DOMAIN_CONFIGS[domain]
+            process_chain = config.get('process_chain', [])
+            
+            # Process URL with operators in the specified chain order
+            for operator_name in process_chain:
+                # Find the operator class by name
+                operator_class = next((op for op in self.operators if op().name == operator_name), None)
+                if operator_class:
+                    operator = operator_class()
+                    logger.info(f"Processing URL with operator: {operator.name}")
+                    url_data = operator.process(url_data['url'], url_data)
+                else:
+                    logger.warning(f"Operator not found: {operator_name}")
+            
+            return url_data
+        except Exception as e:
+            logger.error(f"Error processing URL: {str(e)}")
+            return url_data
+
+    def worker_loop(self):
+        while self.running:
+            try:
+                # Get URL from queue
+                url_data = url_queue.get()
+                if url_data:
+                    # Process URL with enabled operators
+                    processed_data = self.process_url(url_data)
+                    # Handle processed data as needed
+                    logger.info(f"Processed URL: {processed_data['url']}")
+            except Exception as e:
+                logger.error(f"Error in worker loop: {str(e)}")
+            time.sleep(1)  # Prevent busy waiting
 
     def start(self):
-        """启动工作线程"""
-        if not self.is_running:
-            self.is_running = True
-            self.thread = threading.Thread(target=self._process_queue)
+        if not self.running:
+            self.running = True
+            self.thread = threading.Thread(target=self.worker_loop)
             self.thread.daemon = True
             self.thread.start()
             logger.info("URL worker started")
 
     def stop(self):
-        """停止工作线程"""
-        self.is_running = False
+        self.running = False
         if self.thread:
             self.thread.join()
             logger.info("URL worker stopped")
 
-    def _process_queue(self):
-        """处理队列中的URL"""
-        while self.is_running:
-            try:
-                # 从队列中获取URL
-                url = url_queue.get_url()
-                
-                if url:
-                    logger.info(f"Processing URL: {url}")
-                    # 使用URL处理器处理URL
-                    success = url_processor.process_url(url)
-                    
-                    if success:
-                        logger.info(f"Successfully processed URL: {url}")
-                    else:
-                        logger.error(f"Failed to process URL: {url}")
-                else:
-                    # 如果队列为空，等待一段时间
-                    time.sleep(self.processing_interval)
-                    
-            except Exception as e:
-                logger.error(f"Error in worker thread: {str(e)}")
-                time.sleep(self.processing_interval)
-
-# 创建全局工作线程实例
 url_worker = URLWorker() 

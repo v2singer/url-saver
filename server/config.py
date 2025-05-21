@@ -1,5 +1,8 @@
 import os
 from dotenv import load_dotenv
+from typing import List, Dict, Type
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
 load_dotenv()
 
@@ -46,4 +49,38 @@ DOMAIN_CONFIGS = {
         },
         'process_chain': ['lux', 'ffmpeg_audio', 'ffmpeg_subtitle']  # 处理链顺序
     }
-} 
+}
+
+# Queue and Worker Settings
+ENABLE_QUEUE_PROCESSOR = False
+ENABLE_URL_WORKER = False
+
+# Base Operator Class
+class BaseOperator(ABC):
+    @abstractmethod
+    def process(self, url: str, data: Dict) -> Dict:
+        pass
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
+# Operator Registry
+OPERATOR_REGISTRY: Dict[str, Type[BaseOperator]] = {}
+
+# Enabled Operators
+ENABLED_OPERATORS: List[str] = [
+    'lux',
+    'ffmpeg_audio',
+    'ffmpeg_subtitle'
+]
+
+def register_operator(operator_class: Type[BaseOperator]):
+    """Register an operator class to the registry"""
+    OPERATOR_REGISTRY[operator_class().name] = operator_class
+    return operator_class
+
+def get_enabled_operators() -> List[Type[BaseOperator]]:
+    """Get list of enabled operator classes"""
+    return [OPERATOR_REGISTRY[name] for name in ENABLED_OPERATORS if name in OPERATOR_REGISTRY] 
