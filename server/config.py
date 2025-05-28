@@ -3,6 +3,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+HOST = os.getenv('HOST', '0.0.0.0')
+PORT = int(os.getenv('PORT', '8080'))
+
 # Use SQLite database
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./urls.db')
 
@@ -46,4 +49,17 @@ DOMAIN_CONFIGS = {
         },
         'process_chain': ['lux', 'ffmpeg_audio', 'ffmpeg_subtitle']  # 处理链顺序
     }
-} 
+}
+
+# 主从同步配置
+ROLE = os.getenv('ROLE', 'master')  # 'master' 或 'slave'
+MASTER_HOST = os.getenv('MASTER_HOST', '127.0.0.1')
+MASTER_PORT = int(os.getenv('MASTER_PORT', '8080'))
+SLAVE_LIST = os.getenv('SLAVE_LIST', '')  # 逗号分隔的host:port列表
+if SLAVE_LIST:
+    SLAVE_LIST = [
+        {'host': item.split(':')[0], 'port': int(item.split(':')[1])}
+        for item in SLAVE_LIST.split(',') if ':' in item
+    ]
+else:
+    SLAVE_LIST = [] 

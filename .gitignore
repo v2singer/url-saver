@@ -8,6 +8,11 @@ target
 mobile/addons
 mobile/android
 
+# ignore slave fiels
+main_slave.py
+urls_slave.db
+config_slave.py
+
 # 
 downloads
 processed
