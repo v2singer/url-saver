@@ -5,9 +5,10 @@ from server.database import get_db, engine
 from server.models import URL, Base
 from server.url_queue import url_queue
 from server.worker import url_worker
-from server.config import ROLE, MASTER_HOST, MASTER_PORT, SLAVE_LIST, HOST, PORT
+from server.config import ROLE, MASTER_HOST, MASTER_PORT, HOST, PORT
 
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import desc
 import logging
 import traceback
 import os
@@ -31,6 +32,21 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
+
+
+@app.route('/', methods=['GET'])
+def hello():
+    return jsonify({
+        'data': 'hello'
+    })
+
+
+@app.route('/favicon.ico', methods=['GET'])
+def favicon():
+    return jsonify({
+        'data': 'no'
+    })
+
 
 # 建议接口
 @app.route('/extension/suggest', methods=['POST'])
@@ -110,7 +126,7 @@ def create_url():
 def get_urls():
     try:
         db = next(get_db())
-        urls = db.query(URL).all()
+        urls = db.query(URL).order_by(desc(URL.created_at)).limit(10).all()
         return jsonify([{
             'id': url.id,
             'url': url.url,
@@ -244,35 +260,18 @@ def sync_url_pull():
 # --- 从节点定时同步任务 ---
 def slave_sync_loop():
     last_sync = None
+    try:
+        with open('./last_sync', 'r') as fr:
+            line = fr.read()
+            logger.info('[debug] last sync: %s', line)
+        last_sync = datetime.fromisoformat(line)
+    except:
+        last_sync = None
+    print('ready to sync for ', last_sync)
+
     while True:
         try:
             db = next(get_db())
-            # 1. 拉取主节点的增量数据
-            params = {}
-            if last_sync:
-                params['since'] = last_sync
-            resp = requests.get(f'http://{MASTER_HOST}:{MASTER_PORT}/sync/url/pull', params=params, timeout=5)
-            if resp.ok:
-                data = resp.json()
-                for u in data.get('urls', []):
-                    obj = db.query(URL).filter(URL.url == u['url']).first()
-                    if obj:
-                        if u['updated_at'] > obj.updated_at.isoformat():
-                            for k, v in u.items():
-                                if hasattr(obj, k):
-                                    setattr(obj, k, v)
-                            obj.updated_at = datetime.fromisoformat(u['updated_at'])
-                    else:
-                        new_url = URL(**u)
-                        if 'created_at' in u:
-                            new_url.created_at = datetime.fromisoformat(u['created_at'])
-                        if 'updated_at' in u:
-                            new_url.updated_at = datetime.fromisoformat(u['updated_at'])
-                        db.add(new_url)
-                db.commit()
-                # 记录本次同步时间
-                last_sync = datetime.utcnow().isoformat()
-            # 2. 推送本地新增/变更数据到主节点
             q = db.query(URL)
             if last_sync:
                 try:
@@ -281,6 +280,8 @@ def slave_sync_loop():
                 except Exception:
                     pass
             urls = q.all()
+            last_sync = datetime.utcnow().isoformat()
+
             push_data = []
             for u in urls:
                 push_data.append({
@@ -297,16 +298,19 @@ def slave_sync_loop():
             if push_data:
                 try:
                     requests.post(f'http://{MASTER_HOST}:{MASTER_PORT}/sync/url/push', json={'urls': push_data}, timeout=5)
-                except Exception:
+                except Exception as e:
+                    logger.error(f'push data to master failed: {str(e)}')
                     pass
             db.close()
-        except Exception:
-            pass
+            with open('./last_sync', 'w') as fw:
+                fw.write(str(last_sync))
+        except Exception as e:
+            logger.error(f'sync failed: {str(e)}')
+        logger.info(f'sync done at {last_sync}')
         time.sleep(30)  # 每30秒同步一次
 
 if __name__ == '__main__':
     # 初始化数据库
-    SLAVE_LIST='192.168.100.174:8081'
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("Database initialized successfully")
@@ -323,10 +327,12 @@ if __name__ == '__main__':
     #url_worker.start()
     #logger.info("URL worker started")
 
+    # 启动从节点同步任务
+    if ROLE == 'slave':
+        t = threading.Thread(target=slave_sync_loop, daemon=True)
+        t.start() 
+
     # 启动服务器
     print("starting server on %s:%d" % (HOST, PORT))
     app.run(debug=True, port=PORT, host=HOST)
 
-    if ROLE == 'slave':
-        t = threading.Thread(target=slave_sync_loop, daemon=True)
-        t.start() 

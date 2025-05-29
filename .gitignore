@@ -12,7 +12,9 @@ mobile/android
 main_slave.py
 urls_slave.db
 config_slave.py
+last_sync
 
-# 
+# 本地缓存文件
+local
 downloads
 processed
