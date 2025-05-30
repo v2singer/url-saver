@@ -1,3 +1,19 @@
+// 验证URL是否可访问
+async function validateUrls(urls) {
+  const validUrls = [];
+  for (const url of urls) {
+    try {
+      const response = await fetch(`${url}/extension/urls`, { method: 'HEAD' });
+      if (response.ok) {
+        validUrls.push(url);
+      }
+    } catch (error) {
+      console.error(`Failed to validate URL ${url}:`, error);
+    }
+  }
+  return validUrls;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   // 获取当前标签页的URL和标题
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -6,8 +22,17 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('current-url').textContent = currentUrl;
     document.getElementById('current-title').textContent = currentTitle;
     
-    // 获取建议标签
-    getSuggestedTags(currentTitle, currentUrl);
+    // 获取服务器地址列表并校验后获取建议标签
+    chrome.storage.sync.get(['serverUrls'], async function(result) {
+      const serverUrls = result.serverUrls || ['http://localhost:8080'];
+      const validUrls = await validateUrls(serverUrls);
+      if (validUrls.length > 0) {
+        getSuggestedTags(currentTitle, currentUrl, validUrls[0]);
+      } else {
+        const suggestedTagsContainer = document.getElementById('suggested-tags');
+        suggestedTagsContainer.innerHTML = '<div class="error">No available server for suggestions</div>';
+      }
+    });
   });
 
   // 打开配置页面按钮点击事件
@@ -31,10 +56,16 @@ document.addEventListener('DOMContentLoaded', function() {
         notes: notes
       };
 
-      // 获取服务器地址列表并尝试保存
-      chrome.storage.sync.get(['serverUrls'], function(result) {
+      // 获取服务器地址列表并校验后尝试保存
+      chrome.storage.sync.get(['serverUrls'], async function(result) {
         const serverUrls = result.serverUrls || ['http://localhost:8080'];
-        saveToServer(serverUrls, data, statusDiv);
+        const validUrls = await validateUrls(serverUrls);
+        if (validUrls.length > 0) {
+          saveToServer([validUrls[0]], data, statusDiv);
+        } else {
+          statusDiv.textContent = 'No available server to save URL.';
+          statusDiv.style.color = '#f44336';
+        }
       });
     });
   });
@@ -58,13 +89,13 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
-// 获取建议标签
-async function getSuggestedTags(title, url) {
+// 获取建议标签，增加 serverUrl 参数
+async function getSuggestedTags(title, url, serverUrl) {
   const suggestedTagsContainer = document.getElementById('suggested-tags');
   suggestedTagsContainer.innerHTML = '<div class="loading">Loading suggestions...</div>';
 
   try {
-    const response = await fetch('http://localhost:8080/extension/suggest', {
+    const response = await fetch(`${serverUrl}/extension/suggest`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
