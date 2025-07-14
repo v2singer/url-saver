@@ -214,14 +214,20 @@ def sync_url_push():
                 count += 1
         else:
             # 新增
-            new_url = URL(**u)
+            u_copy = dict(u)
+            created_at_str = u_copy.pop('created_at', None)
+            updated_at_str = u_copy.pop('updated_at', None)
+            new_url = URL(**u_copy)
             if 'created_at' in u:
                 new_url.created_at = datetime.fromisoformat(u['created_at'])
             if 'updated_at' in u:
                 new_url.updated_at = datetime.fromisoformat(u['updated_at'])
             db.add(new_url)
             count += 1
-    db.commit()
+    try:
+        db.commit()
+    except Exception as err:
+        print('push error: ', err, urls)
     db.close()
     return jsonify({'status': 'ok', 'updated': count})
 
@@ -334,5 +340,5 @@ if __name__ == '__main__':
 
     # 启动服务器
     print("starting server on %s:%d" % (HOST, PORT))
-    app.run(debug=True, port=PORT, host=HOST)
+    app.run(host=HOST, debug=False, port=PORT)
 
